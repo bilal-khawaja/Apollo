@@ -4,18 +4,25 @@ from typing import Optional, List
 from pydantic import field_validator
 import re
 from datetime import date, datetime
-class UserInput(SQLModel):
-    name : str
-    email : str
+
+class RegistrationInput(SQLModel):
+    org_name : str
+    org_email : str
+    admin_name : str
+    admin_email : str
     password : str
-    @field_validator('email')
+
+    @field_validator('org_email', 'admin_email')
+    @classmethod
     def email_must_be_valid(cls, v):    
         if not re.search(r"\w+@(\w+\.)?\w+\.(com)$",v, re.IGNORECASE):
             raise ValueError("Email must be in valid format and end with .com (e.g., user@example.com)")
         else:
             return v
-            
+
+                        
     @field_validator('password')    
+    @classmethod
     def password_must_be_strong(cls, p):
              if not re.search(r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%&*^_-])[A-Za-z\d!@#$%^&_*-]{5,}$",p):
                  raise ValueError("Password must be at least 5 characters long and contain: 1 uppercase letter, 1 lowercase letter, 1 digit, and 1 special character (!@#$%&*^_-)")

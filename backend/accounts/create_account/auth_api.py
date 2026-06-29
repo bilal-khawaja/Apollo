@@ -1,46 +1,73 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Body
 from sqlmodel import select, Session
-from database.models import User
+from database.models import User, Organizations
 from database.setup import get_session
-from database.schema import UserInput, OrganisationDetails, InvitationDetails
+from database.schema import RegistrationInput, OrganisationDetails, InvitationDetails
 from .auth.token import hash_password, check_hashed_password
 from .auth.token_handler import create_access_token
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 router = APIRouter()
 
-@router.post('/signup')
-def signup(
-    user : UserInput, session : Session = Depends(get_session)):
-    user.email = user.email.strip()
-    user.password = user.password.strip()
-    query = session.exec(select(User).where(User.email == user.email)).first()
+@router.post('/create_account')
+async def signup(
+    org : RegistrationInput, session : AsyncSession = Depends(get_session)):
+    
+    org.org_email = org.org_email.strip()
+    org.password = org.password.strip()
+    org.org_name = org.org_name.strip()
+    org.admin_email = org.admin_email.strip()
+    org.admin_name = org.admin_name.strip()
+    
+    query = await session.exec(select(Organizations).where(Organizations.email == org.org_email)).first()
     if query:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail = "Email already registered")
-    
+      
+    create = Organizations(
+        name = org.org_name,
+        email = org.org_email
+    )    
+
+    session.add(create)
+    await session.flush()  # Ensure the organization is added and its ID is generated
+
     try:
-        hashed_password = hash_password(user.password)
+        hashed_password = hash_password(org.password)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=str(e))
-    
-    create = User(
-        email = user.email,
+
+    create_user = User(
+        org_id = create.id,
+        name = org.admin_name,
+        role = "admin",
+        email = org.admin_email,
         password = hashed_password
-    )    
-    
-    session.add(create)
-    session.commit()
-    session.refresh(create)
-    return {"message" : "User created"}
+    )
+    session.add(create_user)
+    await session.commit()
+    await session.refresh(create_user)
+
+    access_token = create_access_token(
+                                        data = {
+                                            'sub' : create_user.email,
+                                            'org_id' : create.id,
+                                            'role' : create_user.role}
+                                        )
+    return {
+        "message" : "Organization created", 
+        "access_token" : access_token,
+        "token_type" : "bearer"
+                        }
 
 @router.post('/signin')
-def signin(
+async def signin(
     email : str = Body(...), 
     password : str = Body(...), 
-    session : Session = Depends(get_session)):
+    session : AsyncSession = Depends(get_session)):
     
-    query = session.exec(select(User).where(User.email == email)).first()
+    query = await session.exec(select(User).where(User.email == email)).first()
     
     if not query:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -61,4 +88,5 @@ def signin(
             'access_token' : access_token,
             'token_type' : 'bearer'
             }   
+
 

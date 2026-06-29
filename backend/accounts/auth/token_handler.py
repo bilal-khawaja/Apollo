@@ -5,13 +5,18 @@ from typing import Optional
 from decouple import config
 from typing import Dict
 from passlib.context import CryptContext
+import uuid
+from uuid import UUID
+
 SECRET: str = config("SECRET_KEY", cast=str)
 ALGORITHM: str = config("ALGORITHM", cast=str ,default="HS256")
+expiretime: int = config("ACCESS_TOKEN_EXPIRE_MINUTES", cast=int, default=30)
 
-def create_access_token(user_id:int, role:str, expiretime:int) -> Dict[str,str]:
+def create_access_token(user_email:str, role:str, org_id:uuid.UUID, expiretime:int) -> Dict[str,str]:
     payload = {
-        "sub": str(user_id),
+        "sub": user_email,
         "role":role,
+        "org_id": str(org_id),
         "exp": datetime.utcnow() + timedelta(minutes=expiretime)
         }
     token = jwt.encode(payload, SECRET, algorithm=ALGORITHM)

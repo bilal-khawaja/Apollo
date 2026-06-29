@@ -40,7 +40,7 @@ class SupplierOrganisationLink(SQLModel, table = True):
 class Organizations(SQLModel, table = True):
     id : UUID = Field(default_factory = uuid.uuid4, primary_key=True)
     name : str = Field(unique = True, default = None, nullable = False)
-    admin_email: str = Field(unique = True, default = None, nullable = False)
+    email: str = Field(unique = True, default = None, nullable = False)
     suppliers : List["Suppliers"] = Relationship(back_populates = "organizations", link_model = SupplierOrganisationLink)
 
 class Inventory(SQLModel, table = True):
