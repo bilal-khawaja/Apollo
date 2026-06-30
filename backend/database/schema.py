@@ -1,9 +1,17 @@
 from sqlmodel import SQLModel, Field
-from pydantic import BaseModel
 from typing import Optional, List
-from pydantic import field_validator
+from pydantic import field_validator 
 import re
 from datetime import date, datetime
+
+class UserPayload(SQLModel):
+    sub: str
+    role: str
+    org_id: str
+    exp: int
+
+
+
 
 class RegistrationInput(SQLModel):
     org_name : str
@@ -28,6 +36,28 @@ class RegistrationInput(SQLModel):
                  raise ValueError("Password must be at least 5 characters long and contain: 1 uppercase letter, 1 lowercase letter, 1 digit, and 1 special character (!@#$%&*^_-)")
              else:
                     return p  
+
+class UserCreationInput(SQLModel):
+    name : str
+    email : str
+    role : str
+    password : str
+
+    @field_validator('email')
+    @classmethod
+    def email_must_be_valid(cls, v):    
+        if not re.search(r"\w+@(\w+\.)?\w+\.(com)$",v, re.IGNORECASE):
+            raise ValueError("Email must be in valid format and end with .com (e.g., user@example.com)")
+        else:
+            return v
+
+    @field_validator('password')
+    @classmethod
+    def password_must_be_strong(cls, p):
+                if not re.search(r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%&*^_-])[A-Za-z\d!@#$%^&_*-]{5,}$",p):
+                    raise ValueError("Password must be at least 5 characters long and contain: 1 uppercase letter, 1 lowercase letter, 1 digit, and 1 special character (!@#$%&*^_-)")
+                else:
+                        return p    
 
 # For organization creation and update, which will happen after account creation, we will use this model to validate the input data.
 class OrganisationDetails(SQLModel):
@@ -68,4 +98,12 @@ class InventoryInput(SQLModel):
 #    location_id : str
     batch_num : str
 
+# catalogue of products
+class ProductCatalogue(SQLModel):
+    p_name : str
+    p_mg : int
+    sku_or_barcode : str
+    strength : str
+    unit_type : str
+    manufacturer : str
 # Storage rooms info for Locations table
