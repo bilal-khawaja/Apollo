@@ -46,6 +46,7 @@ class Organizations(SQLModel, table = True):
 class Inventory(SQLModel, table = True):
     id : UUID = Field(default_factory = uuid.uuid4, primary_key = True)
     org_id : UUID = Field(foreign_key = "organizations.id", default = None, nullable = True)
+    catalogue_id : UUID = Field(foreign_key = "productcatalogue.id", default = None, nullable = True)
     entry_date : datetime = Field(default_factory = datetime.now, nullable = True)
     entries_by : UUID = Field(foreign_key = "user.id", default = None, nullable = False)
     p_name : str = Field(default = None, nullable = False)
@@ -159,3 +160,12 @@ class OrganisaionalSettings(SQLModel, table = True):
     enable_auto_ordering : bool = Field(default = False, nullable = False)
 
 
+class ProductCatalogue(SQLModel, table = True):
+    id : UUID = Field(default_factory = uuid.uuid4, primary_key = True)
+    org_id : UUID = Field(foreign_key = "organizations.id", default = None, nullable = False)   
+    p_name : str = Field(default = None, nullable = False)
+    p_mg : int = Field(default = 0, nullable = False)   
+    sku_or_barcode : str = Field(default = None, nullable = False)
+    strength : str = Field(default = None, nullable = False)
+    unit_type : str = Field(default = None, nullable = False)
+    manufacturer : str = Field(default = None, nullable = False)

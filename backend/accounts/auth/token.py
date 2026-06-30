@@ -3,7 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
 from .auth_handler import decode_access_token
 import bcrypt
-
+from database.schema import UserPayload
 
 pwd = CryptContext(schemes = ['bcrypt'], deprecated = 'auto')
 
@@ -45,8 +45,9 @@ class JWTBearer(HTTPBearer):
             isTokenValid = True
         return isTokenValid
     
-def get_current_user(info):
-    user = info.context.get("user")
-    if not user:
-        raise ValueError("Authentication required")
-    return user
+async def get_current_user(token: str = Depends(JWTBearer())) -> UserPayload:
+    payload = decode_access_token(token)
+    if not payload:
+        raise HTTPException(status_code=403, detail="Could not validate credentials")
+
+    return UserPayload(**payload)

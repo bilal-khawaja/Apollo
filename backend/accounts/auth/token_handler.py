@@ -12,7 +12,7 @@ SECRET: str = config("SECRET_KEY", cast=str)
 ALGORITHM: str = config("ALGORITHM", cast=str ,default="HS256")
 expiretime: int = config("ACCESS_TOKEN_EXPIRE_MINUTES", cast=int, default=30)
 
-def create_access_token(user_email:str, role:str, org_id:uuid.UUID, expiretime:int) -> Dict[str,str]:
+def create_access_token(user_email:str, role:str, org_id:uuid.UUID, expiretime:int) -> str:
     payload = {
         "sub": user_email,
         "role":role,
