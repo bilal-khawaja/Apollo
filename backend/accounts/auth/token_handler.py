@@ -13,11 +13,12 @@ ALGORITHM: str = config("ALGORITHM", cast=str ,default="HS256")
 expiretime: int = config("ACCESS_TOKEN_EXPIRE_MINUTES", cast=int, default=30)
 
 def create_access_token(user_email:str, role:str, org_id:uuid.UUID, expiretime:int) -> str:
+    expire_at = datetime.utcnow() + timedelta(minutes=expiretime)
     payload = {
         "sub": user_email,
         "role":role,
         "org_id": str(org_id),
-        "exp": datetime.utcnow() + timedelta(minutes=expiretime)
+        "exp": int(expire_at.timestamp())
         }
     token = jwt.encode(payload, SECRET, algorithm=ALGORITHM)
     

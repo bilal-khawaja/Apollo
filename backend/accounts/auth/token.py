@@ -1,9 +1,10 @@
 from fastapi import HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
-from .auth_handler import decode_access_token
+from .token_handler import decode_access_token
 import bcrypt
 from database.schema import UserPayload
+from fastapi import Depends
 
 pwd = CryptContext(schemes = ['bcrypt'], deprecated = 'auto')
 

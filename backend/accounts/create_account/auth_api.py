@@ -3,9 +3,12 @@ from sqlmodel import select, Session
 from database.models import User, Organizations
 from database.setup import get_session
 from database.schema import RegistrationInput, OrganisationDetails, UserCreationInput, ProductCatalogue
-from .auth.token import hash_password, check_hashed_password
-from .auth.token_handler import create_access_token
+from ..auth.token import hash_password, check_hashed_password, get_current_user
+from ..auth.token_handler import create_access_token
 from sqlmodel.ext.asyncio.session import AsyncSession
+from dotenv import load_dotenv
+import os
+load_dotenv()
 
 router = APIRouter()
 
@@ -19,7 +22,8 @@ async def signup(
     org.admin_email = org.admin_email.strip()
     org.admin_name = org.admin_name.strip()
     
-    query = await session.exec(select(Organizations).where(Organizations.email == org.org_email)).first()
+    query = await session.exec(select(Organizations).where(Organizations.email == org.org_email))
+    query = query.first()
     if query:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail = "Email already registered")
@@ -50,11 +54,11 @@ async def signup(
     await session.refresh(create_user)
 
     access_token = create_access_token(
-                                        data = {
-                                            'sub' : create_user.email,
-                                            'org_id' : create.id,
-                                            'role' : create_user.role}
-                                        )
+                            user_email=create_user.email, 
+                            role=create_user.role, 
+                            org_id=create.id, 
+                            expiretime=int(os.getenv("EXPIRES_IN_MINUTES", 120))
+    )
     return {
         "message" : "Organization created", 
         "access_token" : access_token,
@@ -112,7 +116,7 @@ async def signin(
                             detail = "Invalid password") 
   
     access_token = create_access_token(
-                                        data = {
+                                        payload = {
                                             'sub' : query.email,
                                             'id' : query.id,
                                             'role' : query.role}
@@ -150,7 +154,7 @@ async def create_catalogue(
     return {
         "message" : "Product catalogue created"
     }
-    
+
     
 
 
