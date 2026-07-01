@@ -2,12 +2,14 @@ from fastapi import APIRouter, HTTPException, status, Depends, Body
 from sqlmodel import select, Session
 from database.models import User, Organizations
 from database.setup import get_session
-from database.schema import RegistrationInput, OrganisationDetails, UserCreationInput, ProductCatalogue
+from database.schema import RegistrationInput, OrganisationDetails, UserCreationInput
 from ..auth.token import hash_password, check_hashed_password, get_current_user
 from ..auth.token_handler import create_access_token
 from sqlmodel.ext.asyncio.session import AsyncSession
 from dotenv import load_dotenv
 import os
+import uuid
+from uuid import UUID
 load_dotenv()
 
 router = APIRouter()
@@ -105,7 +107,8 @@ async def signin(
     password : str = Body(...), 
     session : AsyncSession = Depends(get_session)):
     
-    query = await session.exec(select(User).where(User.email == email)).first()
+    query = await session.exec(select(User).where(User.email == email))
+    query = query.first()
     
     if not query:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -116,48 +119,15 @@ async def signin(
                             detail = "Invalid password") 
   
     access_token = create_access_token(
-                                        payload = {
-                                            'sub' : query.email,
-                                            'id' : query.id,
-                                            'role' : query.role}
-                                        )
+                            user_email = query.email, 
+                            role = query.role, 
+                            org_id = query.org_id, 
+                            expiretime=int(os.getenv("EXPIRES_IN_MINUTES", 120))
+                )
     return {
             'message':'Login succesful',
             'access_token' : access_token,
             'token_type' : 'bearer'
             }   
-
-@router.post('/create_catalogue')
-async def create_catalogue(
-    catalogue : ProductCatalogue,
-    session : AsyncSession = Depends(get_session),
-    current_user = Depends(get_current_user)):
-
-    check_catalogue = await session.exec(select(ProductCatalogue).where(ProductCatalogue.org_id == current_user.org_id)).first()
-    
-    if check_catalogue:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail = "Catalogue already exists for this organization")
-
-    create_catalogue = ProductCatalogue(
-        org_id = current_user.org_id,
-        p_name = catalogue.p_name,
-        p_mg = catalogue.p_mg,
-        sku_or_barcode = catalogue.sku_or_barcode,
-        strength = catalogue.strength,
-        unit_type = catalogue.unit_type,
-        manufacturer = catalogue.manufacturer
-    )
-    session.add(create_catalogue)
-    await session.commit()
-    await session.refresh(create_catalogue)
-    return {
-        "message" : "Product catalogue created"
-    }
-
-    
-
-
-
 
 

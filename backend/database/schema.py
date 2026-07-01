@@ -98,12 +98,5 @@ class InventoryInput(SQLModel):
 #    location_id : str
     batch_num : str
 
-# catalogue of products
-class ProductCatalogue(SQLModel):
-    p_name : str
-    p_mg : int
-    sku_or_barcode : str
-    strength : str
-    unit_type : str
-    manufacturer : str
+
 # Storage rooms info for Locations table
