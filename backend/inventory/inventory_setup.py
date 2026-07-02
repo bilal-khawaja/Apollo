@@ -5,6 +5,7 @@ from database.setup import get_session
 from accounts.auth.token import  get_current_user
 from sqlmodel.ext.asyncio.session import AsyncSession
 import pandas as pd
+import io
 
 router = APIRouter()
 
@@ -23,12 +24,20 @@ async def upload_catalogue(
         content = await file.read()
         vfile_clone = io.BytesIO(content)
         df = pd.read_excel(vfile_clone)
-        df = pd.where(df.notnull(df), None)
-        catalogue_items_dict = df.dict(orient='records') # records is a list of dictionaries, where each dictionary represents a row in the DataFrame
+        df = df.where(pd.notnull(df), None)
+        catalogue_items_dict = df.to_dict(orient='records') # records is a list of dictionaries, where each dictionary represents a row in the DataFrame
 
         product_count = 0
 
-        catalogue_ojects = [ProductCatalogue(**item) for item in catalogue_items_dict]
+        catalogue_ojects = [ProductCatalogue(
+            **{
+                **item,
+                "org_id": current_user.org_id,
+                "sku_or_barcode": str(item["sku_or_barcode"]),
+                "strength": str(item["strength"])
+            }
+        ) for item in catalogue_items_dict]
+
         session.add_all(catalogue_ojects)
         
         await session.commit()

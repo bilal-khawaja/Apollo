@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from jose import jwt
 from typing import Optional
 from decouple import config
@@ -7,13 +7,15 @@ from typing import Dict
 from passlib.context import CryptContext
 import uuid
 from uuid import UUID
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
-SECRET: str = config("SECRET_KEY", cast=str)
-ALGORITHM: str = config("ALGORITHM", cast=str ,default="HS256")
-expiretime: int = config("ACCESS_TOKEN_EXPIRE_MINUTES", cast=int, default=30)
+SECRET: str = os.getenv("SECRET_KEY")
+ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
 
 def create_access_token(user_email:str, role:str, org_id:uuid.UUID, expiretime:int) -> str:
-    expire_at = datetime.utcnow() + timedelta(minutes=expiretime)
+    expire_at = datetime.now(timezone.utc) + timedelta(minutes=expiretime)
     payload = {
         "sub": user_email,
         "role":role,
