@@ -95,7 +95,6 @@ class InventoryInput(SQLModel):
     p_quantity : int
     mfct_date : date
     exp_date : date
-#    location_id : str
     batch_num : str
 
 
