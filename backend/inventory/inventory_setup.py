@@ -60,8 +60,8 @@ async def upload_catalogue(
 @router.put('/add_products')
 async def add_products(
     is_manual : bool, 
-    data : Optional[list[InventoryInput]],
-    file : Optional[UploadFile] = File(...), 
+    data : Optional[InventoryInput],
+    file : Optional[UploadFile] = File(None), 
     session : AsyncSession = Depends(get_session),
     current_user = Depends(get_current_user)
     ):
@@ -93,7 +93,7 @@ async def add_products(
             location_to_id_map = {item.floor_no: item.id for item in location_items}
 
 
-            inventory_objects = [Inventory(
+            data = [Inventory(
                 **{
                     **item,
                     "org_id": current_user.org_id,
@@ -119,11 +119,32 @@ async def add_products(
                     }
             ) for item in inventory_items]
 
-        insert_data = [{
-            
-        }]
-        inventory_objects = await session.execute(insert(Inventory).values(insert_data))
-        session.add_all(inventory_objects)
+            session.add_all(data)
+
+        cat_id =await session.exec(select(ProductCatalogue).where(ProductCatalogue.sku_or_barcode == data.sku_or_barcode))
+        cat_id = await cat_id.first()
+
+        loc_id = await session.exec(select(Inventory).where(Inventory.floor_no == data.floor_no))
+        loc_id = await loc_id.first()
+
+        inventory_objects =  Inventory(
+            org_id = current_user.org_id,
+            catalogue_id = cat_id.id,
+            entry_date = datetime.now(),
+            entries_by = get_user.id,
+            p_name = data.p_name,
+            p_mg = data.p_mg,
+            p_quantity = data.p_quantity,
+            mfct_date = data.mfct_date,
+            exp_date = data.exp_date,
+            location_id = loc_id.id,
+            batch_num = data.batch_num,
+            min_stock_lvl = data.min_stock_lvl,
+            reorder_point = data.reorder_point
+        )
+        session.add(inventory_objects)
+
+
         await session.commit()
 
         return {"message": f"Successfully added {len(inventory_objects)} inventory items."}
