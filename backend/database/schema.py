@@ -99,3 +99,7 @@ class InventoryInput(SQLModel):
 
 
 # Storage rooms info for Locations table
+# class LocationInput(SQLModel):
+#     floor_no : str
+#     room_no : str
+#     room_type : str

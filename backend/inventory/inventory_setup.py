@@ -13,7 +13,7 @@ from datetime import datetime
 from sqlmodel import insert
 import logging
 from typing import Optional
-
+from feat.xlx_proccessing import file_processor
 router = APIRouter()
 
 #logger = logging.getLogger(__name__)
@@ -30,14 +30,7 @@ async def upload_catalogue(
                                     detail="Only Excel files are supported.")
 
     try:
-        content = await file.read()
-        vfile_clone = io.BytesIO(content)
-        df = pd.read_excel(vfile_clone)
-        df = df.where(pd.notnull(df), None)
-        catalogue_items_dict = df.to_dict(orient='records') # records is a list of dictionaries, where each dictionary represents a row in the DataFrame
-
-        product_count = 0
-
+        catalogue_items_dict = await file_processor(file, clean_headers=True)
         catalogue_ojects = [ProductCatalogue(
             **{
                 **item,
@@ -72,15 +65,7 @@ async def add_products(
     try:
         if is_manual and not data:
 
-         if not file.filename.endswith(('.xlsx', '.xls')):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, 
-                                        detail="Only Excel files are supported.")
-
-            content = await file.read()
-            vfile_name = io.BytesIO(content)
-            df = pd.read_excel(vfile_name)
-            df = df.where(pd.notnull(df), None)
-            inventory_items = df.to_dict(orient='records') 
+            inventory_items = await file_processor(file, clean_headers=True)
 
             items_barcode = [str(item["p_barcode"]) for item in inventory_items]
             catalogue_query = await session.exec(select(ProductCatalogue).where(ProductCatalogue.sku_or_barcode.in_(items_barcode)))
@@ -93,7 +78,7 @@ async def add_products(
             location_to_id_map = {item.floor_no: item.id for item in location_items}
 
 
-            data = [Inventory(
+            bulk_entry = [Inventory(
                 **{
                     **item,
                     "org_id": current_user.org_id,
@@ -119,35 +104,36 @@ async def add_products(
                     }
             ) for item in inventory_items]
 
-            session.add_all(data)
+            session.add_all(bulk_entry)
 
-        cat_id =await session.exec(select(ProductCatalogue).where(ProductCatalogue.sku_or_barcode == data.sku_or_barcode))
-        cat_id = await cat_id.first()
+        else:
+            cat_id =await session.exec(select(ProductCatalogue).where(ProductCatalogue.sku_or_barcode == data.sku_or_barcode))
+            cat_id = await cat_id.first()
 
-        loc_id = await session.exec(select(Inventory).where(Inventory.floor_no == data.floor_no))
-        loc_id = await loc_id.first()
+            loc_id = await session.exec(select(Inventory).where(Inventory.floor_no == data.floor_no))
+            loc_id = await loc_id.first()
 
-        inventory_objects =  Inventory(
-            org_id = current_user.org_id,
-            catalogue_id = cat_id.id,
-            entry_date = datetime.now(),
-            entries_by = get_user.id,
-            p_name = data.p_name,
-            p_mg = data.p_mg,
-            p_quantity = data.p_quantity,
-            mfct_date = data.mfct_date,
-            exp_date = data.exp_date,
-            location_id = loc_id.id,
-            batch_num = data.batch_num,
-            min_stock_lvl = data.min_stock_lvl,
-            reorder_point = data.reorder_point
-        )
-        session.add(inventory_objects)
+            inventory_objects =  Inventory(
+                org_id = current_user.org_id,
+                catalogue_id = cat_id.id,
+                entry_date = datetime.now(),
+                entries_by = get_user.id,
+                p_name = data.p_name,
+                p_mg = data.p_mg,
+                p_quantity = data.p_quantity,
+                mfct_date = data.mfct_date,
+                exp_date = data.exp_date,
+                location_id = loc_id.id,
+                batch_num = data.batch_num,
+                min_stock_lvl = data.min_stock_lvl,
+                reorder_point = data.reorder_point
+            )
+            session.add(inventory_objects)
 
 
         await session.commit()
 
-        return {"message": f"Successfully added {len(inventory_objects)} inventory items."}
+        return {"message": f"Successfully added products inventory items."}
 
     except Exception as e:
         session.rollback()
