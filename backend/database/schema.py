@@ -97,4 +97,15 @@ class InventoryInput(SQLModel):
     exp_date : date
     batch_num : str
 
+class UpdateStorageInfo(SQLModel):
+    floor_no : Optional[int] = None
+    ward_no : Optional[str] = None
+    shelf_no : Optional[str] = None
+    bin_id : Optional[str] = None
 
+class UpdateCatalogue(SQLModel):
+    p_name : Optional[str] = None
+    strength : Optional[str] = None
+    sku_or_barcode : Optional[str] = None
+    unit_type : Optional[str] = None
+    manufacturer : Optional[str] = None
