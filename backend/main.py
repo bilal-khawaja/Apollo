@@ -10,6 +10,7 @@ from database.setup import get_session, init_db
 from dotenv import load_dotenv
 from accounts.create_account.auth_api import router as auth_api
 from inventory.inventory_setup import router as inventory
+from accounts.create_account.acc_setup import router as acc_setup
 load_dotenv()
 
 @asynccontextmanager
@@ -31,7 +32,7 @@ app.add_middleware(
 
 app.include_router(auth_api, prefix="/auth", tags=["Authentication"])
 app.include_router(inventory, prefix="/inventory", tags=["Inventory Management"])
-
+app.include_router(acc_setup, prefix="/account", tags=["Account Setup"])
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
     errors = [err['msg'] for err in exc.errors()] 

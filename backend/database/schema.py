@@ -98,8 +98,3 @@ class InventoryInput(SQLModel):
     batch_num : str
 
 
-# Storage rooms info for Locations table
-# class LocationInput(SQLModel):
-#     floor_no : str
-#     room_no : str
-#     room_type : str
