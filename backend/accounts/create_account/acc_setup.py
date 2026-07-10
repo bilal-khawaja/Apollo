@@ -10,7 +10,7 @@ import os
 import uuid
 from uuid import UUID
 from fastapi import UploadFile, File
-from feat.xlx_processing_generation import file_processor
+from feat.xlx_processing_generation import file_processor, file_generation
 from database.schema import UpdateCatalogue, UpdateStorageInfo
 from typing import Optional, List
 
@@ -153,3 +153,29 @@ async def update_storage_info(
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f"An error occurred while updating the storage information: {str(e)}")
+
+
+# Getting details of product catalogue in excel format
+@router.get('/view_product_catalogue')
+async def view_catalogue(
+    session : AsyncSession = Depends(get_session),
+    current_user = Depends(get_current_user)
+):
+    catalogue_items = await session.exec(select(ProductCatalogue).where(ProductCatalogue.org_id == current_user.org_id))
+    catalogue_items = catalogue_items.all()
+    data = [item.model_dump() for item in catalogue_items]
+
+    return file_generation(data, filename="product_catalogue", xl_name="Product Catalogue")
+
+
+# Getting details of storage units in excel format
+@router.get('/view_storage_units')
+async def view_storage_units(
+    session : AsyncSession = Depends(get_session),
+    current_user = Depends(get_current_user)
+):
+    storage_units = await session.exec(select(Locations).where(Locations.org_id == current_user.org_id))
+    storage_units = storage_units.all()
+    data = [unit.model_dump() for unit in storage_units]
+
+    return file_generation(data, filename="storage_units", xl_name="Storage Units")

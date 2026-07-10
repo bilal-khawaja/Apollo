@@ -36,6 +36,11 @@ def file_generation(data: list[dict], filename: str, xl_name: str):
         columns_to_drop = ["id", "org_id", "catalogue_id", "entry_date", "created_at", "updated_at", "location_id"]
         df = df.drop(columns=[col for col in columns_to_drop if col in df.columns], errors='ignore')
 
+        if 'name' in df.columns:
+            # Create a list of columns with 'name' at the front
+            cols = ['name'] + [col for col in df.columns if col != 'name']
+            df = df[cols]
+            
         # Create an in-memory buffer to hold the Excel file
         buffer = io.BytesIO()
 
