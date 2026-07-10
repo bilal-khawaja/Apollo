@@ -10,7 +10,7 @@ import os
 import uuid
 from uuid import UUID
 from fastapi import UploadFile, File
-from feat.xlx_processing import file_processor
+from feat.xlx_processing_generation import file_processor
 from database.schema import UpdateCatalogue, UpdateStorageInfo
 from typing import Optional, List
 
@@ -110,3 +110,46 @@ async def update_catalogue(
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f"An error occurred while updating the product catalogue: {str(e)}")
+
+
+@router.put('/update_storage_info')
+async def update_storage_info(
+    data : UpdateStorageInfo,
+    id : Optional[UUID] = None,
+    session : AsyncSession = Depends(get_session),
+    current_user = Depends(get_current_user),
+):
+
+    try:
+        if not id:
+
+            add_info = Locations(
+                org_id = current_user.org_id,
+                floor_no = data.floor_no,
+                ward_no = data.ward_no,
+                shelf_no = data.shelf_no,
+                bin_id = data.bin_id
+            )
+
+            session.add(add_info)
+
+        else:
+            update_info = await session.exec(select(Locations).where(Locations.id == id))
+            update_info = await update_info.first()
+
+            if not update_info:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                 detail="Storage unit not found in your locations.")
+            
+            fields_to_update = data.model_dump(exclude_unset=True)
+
+            for key, value in fields_to_update.items():
+                setattr(update_info, key, value)
+    
+        await session.commit()
+        return {"message": "Storage information updated successfully."}
+
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"An error occurred while updating the storage information: {str(e)}")
