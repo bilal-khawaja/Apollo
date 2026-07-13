@@ -109,3 +109,13 @@ class UpdateCatalogue(SQLModel):
     sku_or_barcode : Optional[str] = None
     unit_type : Optional[str] = None
     manufacturer : Optional[str] = None
+
+class UpdateInventory(SQLModel):
+    p_name : Optional[str] = None
+    p_mg : Optional[int] = None
+    p_quantity : Optional[int] = None
+    mfct_date : Optional[date] = None
+    exp_date : Optional[date] = None
+    batch_num : Optional[str] = None
+    min_stock_lvl : Optional[int] = None
+    reorder_point : Optional[int] = None

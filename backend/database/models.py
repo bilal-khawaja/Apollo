@@ -23,6 +23,13 @@ class PaymentStatus(str, Enum):
     INADVANCE = "in advance"
     FAILED = "failed"
 
+class StorageRequirements(str, Enum):
+    ROOMTEMP = "Room Temperature"
+    COLD_CHAIN = "Cold Chain"
+    FREEZER = "Freezer"
+    CONTROLLED_SUB = "Controlled"
+    HAZARDOUS = "Hazardous"
+
 
 class User(SQLModel, table = True):
     id : UUID = Field(default_factory = uuid.uuid4, primary_key = True)
@@ -94,6 +101,7 @@ class Locations(SQLModel, table = True):
     ward_no : str = Field(default = None, nullable = False)   
     shelf_no : str = Field(default = None, nullable = False)
     bin_id : str = Field(default = None, nullable = False)
+    category : str = Field(default = StorageRequirements.ROOMTEMP, nullable = False)
 
 class Orders(SQLModel, table = True):
     id : UUID = Field(default_factory = uuid.uuid4, primary_key = True)
@@ -168,3 +176,4 @@ class ProductCatalogue(SQLModel, table = True):
     strength : str = Field(default = None, nullable = False)
     unit_type : str = Field(default = None, nullable = False)
     manufacturer : str = Field(default = None, nullable = False)
+    category : str = Field(default = StorageRequirements.ROOMTEMP, nullable = False)

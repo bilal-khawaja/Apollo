@@ -92,7 +92,7 @@ async def update_catalogue(
 
         else:
             update_info = await session.exec(select(ProductCatalogue).where(ProductCatalogue.id == id))
-            update_info = await update_info.first()
+            update_info =  update_info.first()
 
             if not update_info:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -135,7 +135,7 @@ async def update_storage_info(
 
         else:
             update_info = await session.exec(select(Locations).where(Locations.id == id))
-            update_info = await update_info.first()
+            update_info = update_info.first()
 
             if not update_info:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
