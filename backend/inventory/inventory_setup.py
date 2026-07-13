@@ -13,7 +13,7 @@ from datetime import datetime
 from sqlmodel import insert
 import logging
 from typing import Optional
-from feat.xlx_processing_generation import file_processor
+from feat.xlx_processing_generation import file_processor, file_generation
 router = APIRouter()
 
 #logger = logging.getLogger(__name__)
@@ -178,3 +178,19 @@ async def update_inventory(
     except Exception as e:
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.get('/view_inventory')
+async def view_inventory(
+    session : AsyncSession = Depends(get_session),
+    current_user = Depends(get_current_user)
+):
+
+    fetch_inventory = await session.exec(select(Inventory).where(Inventory.org_id == current_user.org_id))
+    fetch_inventory = fetch_inventory.all()
+
+    if not fetch_inventory:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                             detail="No inventory items found for your organization.")
+
+    data = [item.model_dump() for item in fetch_inventory]
+    return file_generation(data, filename="inventory_data.xlsx", xl_name="inventory_details")
