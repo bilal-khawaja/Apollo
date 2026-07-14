@@ -90,8 +90,6 @@ async def add_products(
 
     return {"message": f"Successfully added products inventory items."}
 
-
-
 @router.post('/scan_products')
 async def add_products(
     data : InventoryInput,

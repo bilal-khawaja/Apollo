@@ -3,7 +3,7 @@ from typing import Optional
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import HTTPException, status, Depends
-from databse.schema import UpdateInventory
+from database.schema import UpdateInventory
 from datetime import datetime
 
 async def check_stock_levels(session : AsyncSession, data : UpdateInventory):
@@ -39,8 +39,6 @@ async def check_stock_levels(session : AsyncSession, data : UpdateInventory):
             "message": f"Stock is sufficient ({fetch_product.p_quantity}). No action needed."
         }
 
-
-
 async def storage_finder(session: AsyncSession, category: str):
     """
     Function to find a suitable storage location based on category and available space.
@@ -50,7 +48,7 @@ async def storage_finder(session: AsyncSession, category: str):
     storage = await session.exec(select(Locations)
                 .where(Locations.category == category)
                 .order_by(Locations.priority_score.asc()))
-                
+
     storage = storage.all()
 
     for s in storage:
@@ -58,7 +56,3 @@ async def storage_finder(session: AsyncSession, category: str):
             return s  
 
     return None  
-
-
-# for checking storage unit space and if the space is low inventory items are stored in another unit and an email is
-#  sent to Admin to notify about the low space in the storage unit.
