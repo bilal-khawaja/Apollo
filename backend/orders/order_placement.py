@@ -18,6 +18,10 @@ from feat.resource_checkup import storage_finder
 
 router = APIRouter()
 
+# For custom order placement, we will create a new endpoint that accepts an Excel file containing order details.
+#  The endpoint will read the file, validate the data, and then place the orders in the database. 
+# (Order type = NEW ORDER)
+
 @router.post('/place_order')
 async def place_order(
     file: UploadFile = File(...),
@@ -46,3 +50,19 @@ async def place_order(
 
     session.commit()
     return {"message": "Orders placed successfully."}
+
+@router.get('/order_details')
+async def order_details(
+    session : AsyncSession = Depends(get_session),
+    current_user = Depends(get_current_user)
+):
+
+    fetch_orders = await session.exec(select(Orders).where(Orders.org_id == current_user.org_id))
+    fetch_orders = fetch_orders.all()
+
+    if not fetch_orders:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                 detail=f"No orders found for the organization.")
+    
+    data = [item.model_dump() for item in fetch_orders]
+    return file_generation(data, filename=f"order_detail", xl_name="Order Details")

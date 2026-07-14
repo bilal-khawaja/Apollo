@@ -33,7 +33,8 @@ def file_generation(data: list[dict], filename: str, xl_name: str):
         # converting dictionaries into a pandas DataFrame for easier manipulation and Excel writing
         df = pd.DataFrame(data)
 
-        columns_to_drop = ["id", "org_id", "catalogue_id", "entry_date", "created_at", "updated_at", "location_id"]
+        columns_to_drop = ["id", "org_id", "catalogue_id", "entry_date", "created_at", "updated_at",
+         "location_id", "supplier_id", "order_id","transfer_id", "transaction_date"]
         df = df.drop(columns=[col for col in columns_to_drop if col in df.columns], errors='ignore')
 
         if 'name' in df.columns:

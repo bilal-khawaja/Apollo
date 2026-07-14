@@ -114,8 +114,6 @@ class Orders(SQLModel, table = True):
     order_type : str = Field(default = OrderType.LOWSTOCK, nullable = False)
     transfer_id : UUID = Field(foreign_key = "transactions.id", default = None, nullable = True)
     placed_on : datetime = Field(default_factory = datetime.now, nullable = True) 
-    delivery_date : date = Field(default=None, nullable=True)
-    excel_sheet_url : str = Field(default=None, nullable=True)
 
 class Transactions(SQLModel, table = True):
     id : UUID = Field(default_factory = uuid.uuid4, primary_key = True)
