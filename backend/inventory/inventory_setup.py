@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Body, UploadFile, File
-from sqlmodel import select, Session
+from sqlmodel import select
 from database.models import User, Organizations, Inventory, Locations, ProductCatalogue
 from database.setup import get_session
 from accounts.auth.token import  get_current_user
@@ -14,6 +14,7 @@ from sqlmodel import insert
 import logging
 from typing import Optional
 from feat.xlx_processing_generation import file_processor, file_generation
+from feat.resource_checkup import storage_finder
 router = APIRouter()
 
 #logger = logging.getLogger(__name__)
@@ -37,61 +38,53 @@ async def add_products(
     catalogue_items =  catalogue_query.all()
     id_map = {item.name: item for item in catalogue_items}
 
-    # For setting location ID
-    category_list = list({item.category for item in catalogue_items})
-    catalogue_location_relation = await session.exec(select(Locations).where(Locations.category.in_(category_list)))
-    catalogue_location_relation = catalogue_location_relation.all()
-
-    # Composite key mapping for location based on category, ward_no, shelf_no, bin_id, and floor_no
-    catalogue_to_id_map = {f"{loc.category}|{loc.ward_no}|{loc.shelf_no}|{loc.bin_id}|{loc.floor_no}": loc.id
-                                                             for loc in catalogue_location_relation}
     bulk_entry = []
     for item in inventory_items:
         fetch_item = id_map.get(item["p_name"])
         if not fetch_item:
             continue  # Skip if the product is not found in the catalogue
 
-        location_lookup_key = next(
-            (loc for loc in catalogue_location_relation if loc.category == fetch_item.category),
-            None
+        target_location = await storage_finder(session, fetch_item.category)
+
+        if not target_location:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No available storage space found for product '{item['p_name']}' under category '{fetch_item.category}'."
+            )
+        
+        incoming_quantity = int(item["quantity"])
+        target_location.current_occupancy += incoming_quantity
+        bulk_entry.append(
+            Inventory(
+                **{
+                    **item,
+                    "org_id": current_user.org_id,
+                    "catalogue_id": fetch_item.id,
+                    "entry_date": datetime.now(),
+                    "p_name": item["p_name"],
+                    "p_mg": int(item["p_mg"]),
+                    "p_quantity": int(item["quantity"]),
+
+                    "mfct_date": datetime.strptime(item["mfct_date"], "%Y-%m-%d")
+                    if isinstance(item["mfct_date"], str) else item["mfct_date"],
+
+                    "exp_date": datetime.strptime(item["exp_date"], "%Y-%m-%d")
+                    if isinstance(item["exp_date"], str) else item["exp_date"],
+
+                    "location_id": target_location.id, 
+                    "batch_num": str(item["batch_num"]),
+                    "entries_by": get_user.id,
+                    "min_stock_lvl": int(item["min_stock_lvl"]),
+                    "reorder_point": int(item["reorder_point"])
+                }
+            )
         )
-
-        if location_lookup_key:
-            composite_key = f"{location_lookup_key.category}|{location_lookup_key.ward_no}|{location_lookup_key.shelf_no}|{location_lookup_key.bin_id}|{location_lookup_key.floor_no}"
-            target_location_id = catalogue_to_id_map.get(composite_key)
-            if target_location_id:
-                bulk_entry.append(
-                    Inventory(
-                        **{
-                            **item,
-                            "org_id": current_user.org_id,
-                            "catalogue_id": fetch_item.id,
-                            "entry_date": datetime.now(),
-                            "p_name": item["p_name"],
-                            "p_mg": int(item["p_mg"]),
-                            "p_quantity": int(item["quantity"]),
-
-                            "mfct_date": datetime.strptime(item["mfct_date"], "%Y-%m-%d")
-                            if isinstance(item["mfct_date"], str) else item["mfct_date"],
-
-                            "exp_date": datetime.strptime(item["exp_date"], "%Y-%m-%d")
-                            if isinstance(item["exp_date"], str) else item["exp_date"],
-
-                            "location_id": target_location_id, 
-                            "batch_num": str(item["batch_num"]),
-                            "entries_by": get_user.id,
-                            "min_stock_lvl": int(item["min_stock_lvl"]),
-                            "reorder_point": int(item["reorder_point"])
-                        }
-                    )
-                )
     if bulk_entry:
         session.add_all(bulk_entry)
 
     else:
-        
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                 detail=f"Location not found for product {item['p_name']} with category {location_lookup_key.category} in ProductCatalogue.")
+                 detail=f"No products from the uploaded file matched items in the Product Catalogue, or the file was empty.")
 
     await session.commit()
 
@@ -107,11 +100,11 @@ async def add_products(
     ):
 
     get_user = await session.exec(select(User).where(User.email == current_user.sub))
-    get_user = await get_user.first()
+    get_user =  get_user.first()
 
 
     cat = await session.exec(select(ProductCatalogue).where(ProductCatalogue.sku_or_barcode == data.sku_or_barcode))
-    cat = await cat.first()
+    cat =  cat.first()
 
     fetch_location = await session.exec(select(Locations).where(Locations.category == cat.category))
     fetch_location =  fetch_location.first()
@@ -162,7 +155,7 @@ async def update_inventory(
         else:
 
             update_info = await session.exec(select(Inventory).where(Inventory.id == id))
-            update_info = await update_info.first()
+            update_info =  update_info.first()
 
             if not update_info:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,

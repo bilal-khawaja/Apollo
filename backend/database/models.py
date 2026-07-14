@@ -102,6 +102,9 @@ class Locations(SQLModel, table = True):
     shelf_no : str = Field(default = None, nullable = False)
     bin_id : str = Field(default = None, nullable = False)
     category : str = Field(default = StorageRequirements.ROOMTEMP, nullable = False)
+    max_capacity : int = Field(default = 1000, nullable = False)
+    current_occupancy : int = Field(default = 0, nullable = False)
+    priority_score : int = Field(default = 1, nullable = False)
 
 class Orders(SQLModel, table = True):
     id : UUID = Field(default_factory = uuid.uuid4, primary_key = True)
@@ -177,3 +180,11 @@ class ProductCatalogue(SQLModel, table = True):
     unit_type : str = Field(default = None, nullable = False)
     manufacturer : str = Field(default = None, nullable = False)
     category : str = Field(default = StorageRequirements.ROOMTEMP, nullable = False)
+
+class LowStock(SQLModel, table = True):
+    id : UUID = Field(default_factory = uuid.uuid4, primary_key = True)
+    org_id : UUID = Field(foreign_key = "organizations.id", default = None, nullable = False)
+    inventory_id : UUID = Field(foreign_key = "inventory.id", default = None, nullable = False)
+    name : str = Field(default = None, nullable = False)
+    strength : str = Field(default = None, nullable = False)
+    created_on : datetime = Field(default_factory = datetime.now, nullable = True)
