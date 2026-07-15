@@ -43,42 +43,52 @@ async def add_products(
         fetch_item = id_map.get(item["p_name"])
         if not fetch_item:
             continue  # Skip if the product is not found in the catalogue
-
-        target_location = await storage_finder(session, fetch_item.category)
-
-        if not target_location:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No available storage space found for product '{item['p_name']}' under category '{fetch_item.category}'."
-            )
-        
         incoming_quantity = int(item["quantity"])
-        target_location.current_occupancy += incoming_quantity
-        bulk_entry.append(
-            Inventory(
-                **{
-                    **item,
-                    "org_id": current_user.org_id,
-                    "catalogue_id": fetch_item.id,
-                    "entry_date": datetime.now(),
-                    "p_name": item["p_name"],
-                    "p_mg": int(item["p_mg"]),
-                    "p_quantity": int(item["quantity"]),
 
-                    "mfct_date": datetime.strptime(item["mfct_date"], "%Y-%m-%d")
-                    if isinstance(item["mfct_date"], str) else item["mfct_date"],
+        while incoming_quantity > 0:
+            loc = await storage_finder(session, fetch_item.category)
 
-                    "exp_date": datetime.strptime(item["exp_date"], "%Y-%m-%d")
-                    if isinstance(item["exp_date"], str) else item["exp_date"],
+            if not loc:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"No available storage space found for product '{item['p_name']}' under category '{fetch_item.category}'."
+                )
+            
+            available_space = loc.max_capacity - loc.current_occupancy
+            if available_space <= 0:
+                continue  # Skip this location if it's full
 
-                    "location_id": target_location.id, 
-                    "batch_num": str(item["batch_num"]),
-                    "entries_by": get_user.id,
-                    "min_stock_lvl": int(item["min_stock_lvl"]),
-                    "reorder_point": int(item["reorder_point"])
-                }
+            quantity_to_store = min(incoming_quantity, available_space) 
+            loc.current_occupancy += quantity_to_store
+            incoming_quantity -= quantity_to_store
+
+            session.add(loc)  # Update the location's occupancy in the database
+            bulk_entry.append(
+                Inventory(
+                    **{
+                        **item,
+                        "org_id": current_user.org_id,
+                        "catalogue_id": fetch_item.id,
+                        "entry_date": datetime.now(),
+                        "p_name": item["p_name"],
+                        "p_mg": int(item["p_mg"]),
+                        "p_quantity": quantity_to_store,
+
+                        "mfct_date": datetime.strptime(item["mfct_date"], "%Y-%m-%d")
+                        if isinstance(item["mfct_date"], str) else item["mfct_date"],
+
+                        "exp_date": datetime.strptime(item["exp_date"], "%Y-%m-%d")
+                        if isinstance(item["exp_date"], str) else item["exp_date"],
+
+                        "location_id": loc.id, 
+                        "batch_num": str(item["batch_num"]),
+                        "entries_by": get_user.id,
+                        "min_stock_lvl": int(item["min_stock_lvl"]),
+                        "reorder_point": int(item["reorder_point"])
+                    }
+                )
             )
-        )
+
     if bulk_entry:
         session.add_all(bulk_entry)
 
@@ -185,3 +195,27 @@ async def view_inventory(
 
     data = [item.model_dump() for item in fetch_inventory]
     return file_generation(data, filename="inventory_data.xlsx", xl_name="inventory_details")
+
+
+@router.delete('/delete_all_inventory')
+async def delete_all_inventory(
+    session : AsyncSession = Depends(get_session),
+    current_user = Depends(get_current_user)
+):
+    try:
+        delete_query = await session.exec(select(Inventory).where(Inventory.org_id == current_user.org_id))
+        delete_items = delete_query.all()
+
+        if not delete_items:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                             detail="No inventory items found for your organization.")
+
+        for item in delete_items:
+            await session.delete(item)
+
+        await session.commit()
+        return {"message": "All inventory items deleted successfully."}
+
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
