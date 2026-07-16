@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Body, UploadFile, File
 from sqlmodel import select
-from database.models import User, Organizations, Inventory, Locations, ProductCatalogue
+from database.models import User, Organizations, Inventory, Locations, ProductCatalogue, InventoryStorageLink
 from database.setup import get_session
 from accounts.auth.token import  get_current_user
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -38,33 +38,15 @@ async def add_products(
     catalogue_items =  catalogue_query.all()
     id_map = {item.name: item for item in catalogue_items}
 
-    bulk_entry = []
     for item in inventory_items:
+
         fetch_item = id_map.get(item["p_name"])
+
         if not fetch_item:
             continue  # Skip if the product is not found in the catalogue
+
         incoming_quantity = int(item["quantity"])
-
-        while incoming_quantity > 0:
-            loc = await storage_finder(session, fetch_item.category)
-
-            if not loc:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"No available storage space found for product '{item['p_name']}' under category '{fetch_item.category}'."
-                )
-            
-            available_space = loc.max_capacity - loc.current_occupancy
-            if available_space <= 0:
-                continue  # Skip this location if it's full
-
-            quantity_to_store = min(incoming_quantity, available_space) 
-            loc.current_occupancy += quantity_to_store
-            incoming_quantity -= quantity_to_store
-
-            session.add(loc)  # Update the location's occupancy in the database
-            bulk_entry.append(
-                Inventory(
+        new_inventory = Inventory(
                     **{
                         **item,
                         "org_id": current_user.org_id,
@@ -72,7 +54,7 @@ async def add_products(
                         "entry_date": datetime.now(),
                         "p_name": item["p_name"],
                         "p_mg": int(item["p_mg"]),
-                        "p_quantity": quantity_to_store,
+                        "p_quantity": incoming_quantity,
 
                         "mfct_date": datetime.strptime(item["mfct_date"], "%Y-%m-%d")
                         if isinstance(item["mfct_date"], str) else item["mfct_date"],
@@ -80,24 +62,18 @@ async def add_products(
                         "exp_date": datetime.strptime(item["exp_date"], "%Y-%m-%d")
                         if isinstance(item["exp_date"], str) else item["exp_date"],
 
-                        "location_id": loc.id, 
                         "batch_num": str(item["batch_num"]),
                         "entries_by": get_user.id,
                         "min_stock_lvl": int(item["min_stock_lvl"]),
                         "reorder_point": int(item["reorder_point"])
                     }
                 )
-            )
+        session.add(new_inventory)
+        await session.flush()  # Flush to get the inventory_id for linking
 
-    if bulk_entry:
-        session.add_all(bulk_entry)
-
-    else:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                 detail=f"No products from the uploaded file matched items in the Product Catalogue, or the file was empty.")
+        store_in_locations = await storage_finder(session, fetch_item.category, incoming_quantity, new_inventory.id, current_user.org_id)
 
     await session.commit()
-
     return {"message": f"Successfully added products inventory items."}
 
 @router.post('/scan_products')
@@ -218,7 +194,7 @@ async def update_inventory_quantity(
         else:
             inventory_item.p_quantity += quantity
             location.current_occupancy += quantity
-            
+
         await session.commit()
         return {"message": f"Successfully updated inventory quantity for product '{product.name}'."}
 
@@ -265,3 +241,4 @@ async def delete_all_inventory(
     except Exception as e:
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+

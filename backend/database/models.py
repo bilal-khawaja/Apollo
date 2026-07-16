@@ -49,6 +49,12 @@ class SupplierOrganisationLink(SQLModel, table = True):
     supplier_id : UUID = Field(foreign_key = "suppliers.id", default = None, nullable = False)
     org_id : UUID = Field(foreign_key = "organizations.id", default = None, nullable = False)
 
+class InventoryStorageLink(SQLModel, table = True):
+    id : UUID = Field(default_factory = uuid.uuid4, primary_key = True)
+    org_id : UUID = Field(foreign_key = "organizations.id", default = None, nullable = False)
+    inventory_id : UUID = Field(foreign_key = "inventory.id", default = None, nullable = False)
+    location_id : UUID = Field(foreign_key = "locations.id", default = None, nullable = False)
+
 class Organizations(SQLModel, table = True):
     id : UUID = Field(default_factory = uuid.uuid4, primary_key=True)
     name : str = Field(unique = True, default = None, nullable = False)
@@ -66,10 +72,10 @@ class Inventory(SQLModel, table = True):
     p_quantity : int = Field(default = 0, nullable = False)
     mfct_date : date = Field(default = None, nullable = True)
     exp_date : date = Field(default = None, nullable = True)
-    location_id : UUID = Field(foreign_key = "locations.id", default = None, nullable = False)
     batch_num : str = Field(default = None, nullable = True)
     min_stock_lvl : int = Field(default = 0, nullable = False)
     reorder_point : int = Field(default = 0, nullable = False)
+    locations : "Locations" = Relationship(back_populates = "invetory", link_model = InventoryStorageLink)
 
     @field_validator('p_quantity', 'p_mg', 'min_stock_lvl', 'reorder_point')
     @classmethod
@@ -110,6 +116,7 @@ class Locations(SQLModel, table = True):
     max_capacity : int = Field(default = 1000, nullable = False)
     current_occupancy : int = Field(default = 0, nullable = False)
     priority_score : int = Field(default = 1, nullable = False)
+    invetory : List["Inventory"] = Relationship(back_populates = "locations", link_model = InventoryStorageLink)
 
 class Orders(SQLModel, table = True):
     id : UUID = Field(default_factory = uuid.uuid4, primary_key = True)
@@ -117,7 +124,7 @@ class Orders(SQLModel, table = True):
     supplier_id : UUID = Field(foreign_key = "suppliers.id", default = None, nullable = False)
     approval_status : str = Field(default = ApprovalStatus.PENDING, nullable = False)
     name : str = Field(default = None, nullable = False)
-    strength : str = Field(default = None, nullable = False)
+    strength : int = Field(default = None, nullable = False)
     product_type : str = Field(default = None, nullable = False)
     quantity : int = Field(default = 0, nullable = False)
     order_type : str = Field(default = OrderType.LOWSTOCK, nullable = False)
