@@ -179,3 +179,37 @@ async def view_storage_units(
     data = [unit.model_dump() for unit in storage_units]
 
     return file_generation(data, filename="storage_units", xl_name="Storage Units")
+
+@router.delete('/delete_product_from_catalogue')
+async def delete_product_from_catalogue(
+    id : UUID,
+    session : AsyncSession = Depends(get_session),
+    current_user = Depends(get_current_user)
+):
+    product = await session.exec(select(ProductCatalogue).where(ProductCatalogue.id == id).with_for_update())
+    product = product.first()
+
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                             detail="Product not found in your catalogue.")
+
+    await session.delete(product)
+    await session.commit()
+    return {"message": "Product deleted successfully."}
+
+@router.delete('/delete_storage_unit')
+async def delete_storage_unit(
+    id : UUID,
+    session : AsyncSession = Depends(get_session),
+    current_user = Depends(get_current_user)
+):
+    storage_unit = await session.exec(select(Locations).where(Locations.id == id).with_for_update())
+    storage_unit = storage_unit.first()
+
+    if not storage_unit:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                             detail="Storage unit not found in your locations.")
+
+    await session.delete(storage_unit)
+    await session.commit()
+    return {"message": "Storage unit deleted successfully."}

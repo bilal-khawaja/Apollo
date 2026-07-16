@@ -30,6 +30,11 @@ class StorageRequirements(str, Enum):
     CONTROLLED_SUB = "Controlled"
     HAZARDOUS = "Hazardous"
 
+class OrderStatus(str, Enum):
+    PENDING = "Pending"
+    REJECTED = "Rejected"
+    DELIVERED = "Delivered"
+    CANCELLED = "Cancelled"
 
 class User(SQLModel, table = True):
     id : UUID = Field(default_factory = uuid.uuid4, primary_key = True)
@@ -111,9 +116,14 @@ class Orders(SQLModel, table = True):
     org_id : UUID = Field(foreign_key = "organizations.id", default = None, nullable = False)
     supplier_id : UUID = Field(foreign_key = "suppliers.id", default = None, nullable = False)
     approval_status : str = Field(default = ApprovalStatus.PENDING, nullable = False)
+    name : str = Field(default = None, nullable = False)
+    strength : str = Field(default = None, nullable = False)
+    product_type : str = Field(default = None, nullable = False)
+    quantity : int = Field(default = 0, nullable = False)
     order_type : str = Field(default = OrderType.LOWSTOCK, nullable = False)
     transfer_id : UUID = Field(foreign_key = "transactions.id", default = None, nullable = True)
     placed_on : datetime = Field(default_factory = datetime.now, nullable = True) 
+    order_status : str = Field(default = OrderStatus.PENDING, nullable = False)
 
 class Transactions(SQLModel, table = True):
     id : UUID = Field(default_factory = uuid.uuid4, primary_key = True)

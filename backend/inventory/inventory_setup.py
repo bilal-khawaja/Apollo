@@ -101,7 +101,7 @@ async def add_products(
     return {"message": f"Successfully added products inventory items."}
 
 @router.post('/scan_products')
-async def add_products(
+async def scan_products(
     data : InventoryInput,
     session : AsyncSession = Depends(get_session),
     current_user = Depends(get_current_user)
@@ -138,7 +138,7 @@ async def add_products(
     return {"message": f"Successfully added products inventory items."}
 
 
-@router.put('/update_inventory')
+@router.put('/edit_inventory')
 async def update_inventory(
     data : UpdateInventory,
     id : Optional[UUID] = None,
@@ -162,7 +162,7 @@ async def update_inventory(
 
         else:
 
-            update_info = await session.exec(select(Inventory).where(Inventory.id == id))
+            update_info = await session.exec(select(Inventory).where(Inventory.id == id).with_for_update())
             update_info =  update_info.first()
 
             if not update_info:
@@ -176,6 +176,52 @@ async def update_inventory(
         await session.commit()
         return {"message": f"Successfully updated inventory item."} 
     
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+# For updating the inventory quantity based on barcode and action type (consume or add), with the help
+# of pessimistic locking to avoid race conditions. This
+@router.put('/update_inventory_quantity')
+async def update_inventory_quantity( 
+    barcode : str,
+    action_type : str,
+    location_id : UUID,
+    quantity : int,
+    session : AsyncSession = Depends(get_session),
+    current_user = Depends(get_current_user)
+):
+
+    try:
+        check_barcode = await session.exec(select(ProductCatalogue).where(ProductCatalogue.sku_or_barcode == barcode))
+        product = check_barcode.first()
+
+        if not product:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        
+        inventory_lookup = await session.exec(select(Inventory).where(
+            Inventory.catalogue_id == product.id,
+            Inventory.location_id == location_id).with_for_update())
+        inventory_item = inventory_lookup.first()
+
+        location_lookup = await session.exec(select(Locations).where(Locations.id == location_id).with_for_update())
+        location = location_lookup.first()
+
+        if not inventory_item:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                             detail="Inventory item not found")
+        if action_type == "consume":
+            inventory_item.p_quantity -= quantity
+            location.current_occupancy -= quantity
+        
+        else:
+            inventory_item.p_quantity += quantity
+            location.current_occupancy += quantity
+            
+        await session.commit()
+        return {"message": f"Successfully updated inventory quantity for product '{product.name}'."}
+
     except Exception as e:
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
