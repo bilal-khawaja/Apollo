@@ -15,6 +15,8 @@ import logging
 from typing import Optional
 from feat.xlx_processing_generation import file_processor, file_generation
 from feat.resource_checkup import storage_finder
+from feat.caching import validate_idempotency
+
 router = APIRouter()
 
 #logger = logging.getLogger(__name__)
@@ -76,7 +78,7 @@ async def add_products(
     await session.commit()
     return {"message": f"Successfully added products inventory items."}
 
-@router.post('/scan_products')
+@router.post('/scan_products_input')
 async def scan_products(
     data : InventoryInput,
     session : AsyncSession = Depends(get_session),
@@ -158,27 +160,27 @@ async def update_inventory(
 
 
 # For updating the inventory quantity based on barcode and action type (consume or add), with the help
-# of pessimistic locking to avoid race conditions. This
+# of pessimistic locking to avoid race conditions.
 @router.put('/update_inventory_quantity')
 async def update_inventory_quantity( 
     barcode : str,
     action_type : str,
-    location_id : UUID,
+    location_id : uuid.UUID,
     quantity : int,
     session : AsyncSession = Depends(get_session),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_user),
+    scan_id = Depends(validate_idempotency)
 ):
 
     try:
-        check_barcode = await session.exec(select(ProductCatalogue).where(ProductCatalogue.sku_or_barcode == barcode))
+        check_barcode = await session.exec(select(ProductCatalogue).where(ProductCatalogue.sku_or_barcode == barcode).with_for_update())
         product = check_barcode.first()
 
         if not product:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
         
         inventory_lookup = await session.exec(select(Inventory).where(
-            Inventory.catalogue_id == product.id,
-            Inventory.location_id == location_id).with_for_update())
+            Inventory.catalogue_id == product.id).with_for_update())
         inventory_item = inventory_lookup.first()
 
         location_lookup = await session.exec(select(Locations).where(Locations.id == location_id).with_for_update())
