@@ -14,7 +14,7 @@ from sqlmodel import insert
 import logging
 from typing import Optional
 from feat.xlx_processing_generation import file_processor, file_generation
-from feat.resource_checkup import storage_finder
+from feat.resource_checker import storage_finder
 
 router = APIRouter()
 

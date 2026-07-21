@@ -80,5 +80,3 @@ async def storage_finder(session: AsyncSession, category: str, quantity : int, i
                 break
 
     return None
-
-

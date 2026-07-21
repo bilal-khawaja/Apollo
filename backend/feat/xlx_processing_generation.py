@@ -2,6 +2,9 @@ import pandas as pd
 import io
 from fastapi import UploadFile, File, HTTPException, status
 from fastapi.responses import StreamingResponse
+from .webhooks_service import N8nEndpoints, get_n8n_url
+import httpx
+
 
 async def file_processor(file: UploadFile, clean_headers: bool = True) -> list[dict]:
     """
@@ -25,44 +28,27 @@ async def file_processor(file: UploadFile, clean_headers: bool = True) -> list[d
         raise HTTPException(status_code=400, detail=f"Failed to process Excel formatting: {str(e)}")
 
 
-def file_generation(data: list[dict], filename: str, xl_name: str):
-
-    # Utility function to generate an Excel file from a list of dictionaries.
-
-    try:
-        # converting dictionaries into a pandas DataFrame for easier manipulation and Excel writing
-        df = pd.DataFrame(data)
-
-        columns_to_drop = ["id", "org_id", "catalogue_id", "entry_date", "created_at", "updated_at",
-         "location_id", "supplier_id", "order_id","transfer_id", "transaction_date"]
-        df = df.drop(columns=[col for col in columns_to_drop if col in df.columns], errors='ignore')
-
-        if 'name' in df.columns:
-            # Create a list of columns with 'name' at the front
-            cols = ['name'] + [col for col in df.columns if col != 'name']
-            df = df[cols]
-            
-        # Create an in-memory buffer to hold the Excel file
-        buffer = io.BytesIO()
-
-        # Use pandas ExcelWriter to write the DataFrame to the buffer with openpyxl engine
-        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name=xl_name)
+async def file_generation(data: list[dict], filename: str, timeout : float = 30.0 ):
         
-        # Reset the buffer's position to the beginning so it can be read from the start
-        buffer.seek(0)
+        url = get_n8n_url(N8nEndpoints.FILE_GENERATION)
 
-        # Prepare the response headers to indicate a file attachment with the specified filename
-        headers = {
-            'Content-Disposition': f'attachment; filename="{filename}.xlsx"'
-        }
+        async with httpx.AsyncClient() as client:
+            try:
 
-        # Return a StreamingResponse to send the Excel file back to the client
-        return StreamingResponse(
-        buffer,
-        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        headers=headers)
+                response = await client.post(url, json=data, timeout=timeout)
+                headers = {
+                        'Content-Disposition': f'attachment; filename="{filename}.xlsx"'
+                    }
+                
+                if response.status_code != 200:
+                    raise HTTPException(status_code=response.status_code, detail="Failed to generate Excel file.")
 
-    except Exception as e:
-        raise HTTPException(status_code=500, 
-        detail=f"Failed to generate Excel file: {str(e)}")
+                buffer = io.BytesIO(response.content)
+
+                return StreamingResponse(
+                buffer,
+                media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                headers=headers)
+
+            except httpx.RequestError as e:
+                raise HTTPException(status_code=500, detail=f"Error communicating with the file generation service: {str(e)}")

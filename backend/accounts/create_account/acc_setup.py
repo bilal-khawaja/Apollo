@@ -163,9 +163,9 @@ async def view_catalogue(
 ):
     catalogue_items = await session.exec(select(ProductCatalogue).where(ProductCatalogue.org_id == current_user.org_id))
     catalogue_items = catalogue_items.all()
-    data = [item.model_dump() for item in catalogue_items]
+    data = [item.model_dump(mode="json") for item in catalogue_items]
 
-    return file_generation(data, filename="product_catalogue", xl_name="Product Catalogue")
+    return await file_generation(data, filename="product_catalogue")
 
 
 # Getting details of storage units in excel format
@@ -176,9 +176,9 @@ async def view_storage_units(
 ):
     storage_units = await session.exec(select(Locations).where(Locations.org_id == current_user.org_id))
     storage_units = storage_units.all()
-    data = [unit.model_dump() for unit in storage_units]
+    data = [unit.model_dump(mode="json") for unit in storage_units]
 
-    return file_generation(data, filename="storage_units", xl_name="Storage Units")
+    return await file_generation(data, filename="storage_units")
 
 @router.delete('/delete_product_from_catalogue')
 async def delete_product_from_catalogue(

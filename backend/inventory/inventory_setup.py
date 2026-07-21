@@ -14,8 +14,9 @@ from sqlmodel import insert
 import logging
 from typing import Optional
 from feat.xlx_processing_generation import file_processor, file_generation
-from feat.resource_checkup import storage_finder
+from feat.resource_checker import storage_finder
 from feat.caching import validate_idempotency
+from feat.webhooks_service import get_n8n_url, N8nEndpoints
 
 router = APIRouter()
 
@@ -217,8 +218,8 @@ async def view_inventory(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                                              detail="No inventory items found for your organization.")
 
-    data = [item.model_dump() for item in fetch_inventory]
-    return file_generation(data, filename="inventory_data.xlsx", xl_name="inventory_details")
+    data = [item.model_dump(mode='json') for item in fetch_inventory]
+    return  await file_generation(data, filename="inventory_data.xlsx")
 
 
 @router.delete('/delete_all_inventory')
