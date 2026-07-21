@@ -31,7 +31,8 @@ async def file_processor(file: UploadFile, clean_headers: bool = True) -> list[d
 async def file_generation(data: list[dict], filename: str, timeout : float = 30.0 ):
         
         url = get_n8n_url(N8nEndpoints.FILE_GENERATION)
-
+        
+        # Calling webhooks service to generate the excel file
         async with httpx.AsyncClient() as client:
             try:
 
@@ -43,6 +44,7 @@ async def file_generation(data: list[dict], filename: str, timeout : float = 30.
                 if response.status_code != 200:
                     raise HTTPException(status_code=response.status_code, detail="Failed to generate Excel file.")
 
+                # Converting the response content to a BytesIO object for streaming
                 buffer = io.BytesIO(response.content)
 
                 return StreamingResponse(
