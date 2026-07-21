@@ -40,7 +40,7 @@ Operational Separation: By moving formatting logic, template routing, and file g
 
 5. Why We Chose n8n (Architectural Rationale)
 
-I chose an event-driven webhook architecture with n8n for two main reasons: architectural decoupling and operational efficiency."
+I chose an event-driven webhook architecture with n8n for two main reasons: architectural decoupling and operational efficiency.
 1. First, I wanted to keep the core FastAPI backend focused entirely on high-performance clinical transactions, like barcode scanning, where sub-second latency is critical. Running Celery introduces an 'infrastructure tax' you have to manage Redis brokers, monitor worker daemons, and handle task serialization schemas just to send notifications.
 2. Second, business workflows like email styling, routing, and PDF creation change frequently. By offloading this to n8n, we completely decouple our business logic. If a hospital administrator wants to edit the PDF formatting of a purchase order or route low-stock alerts to Slack instead of email, we can build and test that visually in n8n in minutes without having to refactor code, run tests, or redeploy our core FastAPI application.
 
