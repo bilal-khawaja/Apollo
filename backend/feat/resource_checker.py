@@ -7,19 +7,19 @@ from fastapi import HTTPException, status, Depends
 from database.schema import UpdateInventory
 from datetime import datetime
 from uuid import UUID
-
+from .worker_setup import celery_app
+from database.setup import get_session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 async def check_stock_levels(session : AsyncSession, data : UpdateInventory):
     """ 
-    Function to check stock levels if the levels are low an email is sent to Admin
-    and generates a record in databse model for the items that need to be ordered.
+    Function to check stock levels if the levels are low it stores the items in a seperate table for tracking and to later send email for the re-ordering.
     """
 
     fetch_product = await session.exec(select(Inventory).where(Inventory.p_name == data.p_name))
     fetch_product = fetch_product.first()
 
     if fetch_product.p_quantity < fetch_product.min_stock_lvl:
-        # Logic to send email to Admin
 
         low_stock_record = LowStock(
             org_id = fetch_product.org_id,
@@ -80,3 +80,45 @@ async def storage_finder(session: AsyncSession, category: str, quantity : int, i
                 break
 
     return None
+
+@celery_app.task(bind=True, max_retries=3)
+async def process_low_stock_items(self):
+
+    async with AsyncSession(engine) as session:
+        fetch_low_stock_items = await session.exec(select(LowStock
+        ).where(LowStock.order_placed == False
+        ).options(
+            defer(LowStock.created_on),
+            defer(LowStock.id),
+            defer(LowStock.org_id),
+            defer(LowStock.inventory_id),
+
+        ))
+
+        fetch_low_stock_items = fetch_low_stock_items.all()
+        if not fetch_low_stock_items:
+                    return "No low stock items found to process."
+
+        url = get_n8n_url(N8nEndpoints.LOW_STOCK)
+        data = [item.model_dump(mode='json') for item in fetch_low_stock_items]
+
+        with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(url, json=data, timeout=30.0)
+
+                if response.status_code != 200:
+                        raise RuntimeError(f"n8n webhook failed with status code {response.status_code}")
+
+                for item in fetch_low_stock_items:
+                    item.is_notified = True
+                    session.add(item)
+
+                await session.commit()
+                return f"Successfully notified n8n for {len(fetch_low_stock_items)} items."
+
+            except httpx.RequestError as e:
+                raise self.retry(exc=e, countdown=60)
+
+            except Exception as exc:
+                        await session.rollback()
+                        raise self.retry(exc=exc, countdown=60)

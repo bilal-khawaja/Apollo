@@ -39,3 +39,5 @@ Thumbs.db
 *.xlsx
 *.xls
 *.csv
+# Celery Beat schedule database files
+celerybeat-schedule*
