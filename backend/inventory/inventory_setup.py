@@ -14,7 +14,7 @@ from sqlmodel import insert
 import logging
 from typing import Optional
 from feat.xlx_processing_generation import file_processor, file_generation
-from feat.resource_checker import storage_finder
+from feat.resource_checker import storage_finder, check_stock_levels
 from feat.caching import validate_idempotency
 from feat.webhooks_service import get_n8n_url, N8nEndpoints
 
@@ -197,6 +197,8 @@ async def update_inventory_quantity(
         else:
             inventory_item.p_quantity += quantity
             location.current_occupancy += quantity
+
+        quantity_check = await check_stock_levels(session, inventory_item)
 
         await session.commit()
         return {"message": f"Successfully updated inventory quantity for product '{product.name}'."}

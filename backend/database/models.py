@@ -202,4 +202,6 @@ class LowStock(SQLModel, table = True):
     inventory_id : UUID = Field(foreign_key = "inventory.id", default = None, nullable = False)
     name : str = Field(default = None, nullable = False)
     strength : str = Field(default = None, nullable = False)
+    order_placed : bool = Field(default = False, nullable = False)
+    is_notified : bool = Field(default = False, nullable = False)
     created_on : datetime = Field(default_factory = datetime.now, nullable = True)
